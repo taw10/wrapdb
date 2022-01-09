@@ -23,9 +23,10 @@ import typing as T
 import os
 import tempfile
 import platform
+import sysconfig
 
 from pathlib import Path
-from utils import Version, is_ci, is_debianlike
+from utils import Version, is_ci, is_debianlike, is_linux, is_windows
 
 PERMITTED_FILES = ['generator.sh', 'meson.build', 'meson_options.txt', 'LICENSE.build']
 PER_PROJECT_PERMITTED_FILES = {
@@ -36,6 +37,9 @@ PER_PROJECT_PERMITTED_FILES = {
         'generate_gypi.pl.patch',
         'meson.build.tmpl',
         'README.md',
+    ],
+    'lame': [
+        'lame.h',
     ],
 }
 NO_TABS_FILES = ['meson.build', 'meson_options.txt']
@@ -56,13 +60,14 @@ class TestReleases(unittest.TestCase):
 
         system = platform.system().lower()
         cls.skip = cls.ci_config[f'skip_{system}']
+        cls.fatal_warnings = os.environ.get('TEST_FATAL_WARNINGS', 'yes') == 'yes'
 
     def test_releases_json(self):
         # All tags must be in the releases file
         for t in self.tags:
             name, version = t.rsplit('_', 1)
             self.assertIn(name, self.releases)
-            self.assertIn(version, self.releases[name]['versions'])
+            self.assertIn(version, self.releases[name]['versions'], f"for {name}")
 
         # Verify keys are sorted
         self.assertEqual(sorted(self.releases.keys()), list(self.releases.keys()))
@@ -70,6 +75,24 @@ class TestReleases(unittest.TestCase):
         for name, info in self.releases.items():
             for k in info.keys():
                 self.assertIn(k, PERMITTED_KEYS)
+
+    def get_patch_path(self, wrap_section):
+        patch_directory = wrap_section.get('patch_directory')
+        if patch_directory:
+            return Path('subprojects', 'packagefiles', patch_directory)
+
+        return None
+
+    def check_meson_version(self, name: str, version: str, patch_path: str, builddir: str = '_build'):
+        with self.subTest(step="check_meson_version"):
+            json_file = Path(builddir) / "meson-info/intro-projectinfo.json"
+            # don't check if the build was skipped
+            if json_file.exists():
+                with open(json_file) as project_info_file:
+                    project_info = json.load(project_info_file)
+                    subproject, = [subproj for subproj in project_info["subprojects"] if subproj["name"] == name]
+                    if subproject['version'] != 'undefined' and patch_path:
+                        self.assertEqual(subproject['version'], version)
 
     def test_releases(self):
         for name, info in self.releases.items():
@@ -103,11 +126,9 @@ class TestReleases(unittest.TestCase):
                         self.assertIn('provide', config.sections())
                         self.assertTrue(config.items('provide'))
 
-                patch_directory = wrap_section.get('patch_directory')
-                if patch_directory:
+                patch_path = self.get_patch_path(wrap_section)
+                if patch_path:
                     with self.subTest(step='patch_directory'):
-                        patch_path = Path('subprojects', 'packagefiles', patch_directory)
-
                         self.assertTrue(patch_path.is_dir())
                         # FIXME: Not all wraps currently complies, only check for wraps we modify.
                         if extra_checks:
@@ -150,7 +171,9 @@ class TestReleases(unittest.TestCase):
                     if i == 0 and t not in self.tags:
                         with self.subTest(step='check_new_release'):
                             self.check_new_release(name)
-                            self.assertNotIn(name, self.skip)
+                            with self.subTest(f'If this works now, please remove it from skip_{platform.system().lower()}!'):
+                                self.assertNotIn(name, self.skip)
+                            self.check_meson_version(name, ver, patch_path)
                     else:
                         with self.subTest(step='version is tagged'):
                             self.assertIn(t, self.tags)
@@ -167,8 +190,8 @@ class TestReleases(unittest.TestCase):
             try:
                 with tempfile.TemporaryDirectory() as d:
                     self.check_new_release(name, d)
-                passed.append(name)
-            except subprocess. CalledProcessError:
+                    passed.append(name)
+            except subprocess.CalledProcessError:
                 failed.append(name)
         print(f'{len(passed)} passed:', ', '.join(passed))
         print(f'{len(skipped)} skipped:', ', '.join(skipped))
@@ -196,7 +219,16 @@ class TestReleases(unittest.TestCase):
 
     def check_new_release(self, name: str, builddir: str = '_build'):
         ci = self.ci_config.get(name, {})
-        options = ['--fatal-meson-warnings', f'-Dwraps={name}']
+        if ci.get('linux_only', False) and not is_linux():
+            return
+        options = [f'-Dwraps={name}']
+        if ci.get('fatal_warnings', True) and self.fatal_warnings:
+            options.append('--fatal-meson-warnings')
+        if is_windows():
+            # On Windows we need to install python modules outside of prefix.
+            for i in {'purelib', 'platlib'}:
+                path = sysconfig.get_paths()[i]
+                options += [f'-Dpython.{i}dir={path}']
         options += [f'-D{o}' for o in ci.get('build_options', [])]
         if Path(builddir, 'meson-private', 'cmd_line.txt').exists():
             options.append('--wipe')
@@ -207,9 +239,23 @@ class TestReleases(unittest.TestCase):
             else:
                 s = ', '.join(debian_packages)
                 print(f'The following packages could be required: {s}')
-        subprocess.check_call(['meson', 'setup', builddir] + options)
+        try:
+            subprocess.check_call(['meson', 'setup', builddir] + options)
+        except subprocess.CalledProcessError:
+            log_file = Path(builddir, 'meson-logs', 'meson-log.txt')
+            print('::group::==== meson-log.txt ====')
+            print(log_file.read_text(encoding='utf-8'))
+            print('::endgroup::')
+            raise
         subprocess.check_call(['meson', 'compile', '-C', builddir])
-        subprocess.check_call(['meson', 'test', '-C', builddir])
+        try:
+            subprocess.check_call(['meson', 'test', '-C', builddir, '--print-errorlogs'])
+        except subprocess.CalledProcessError:
+            log_file = Path(builddir, 'meson-logs', 'testlog.txt')
+            print('::group::==== testlog.txt ====')
+            print(log_file.read_text(encoding='utf-8'))
+            print('::endgroup::')
+            raise
 
     def is_permitted_file(self, subproject: str, filename: str):
         if filename in PERMITTED_FILES:

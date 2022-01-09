@@ -1,5 +1,5 @@
 project('benchmark', 'cpp',
-  version : '1.5.2',
+  version : '1.6.0',
   default_options : ['cpp_std=c++11'],
   license : 'Apache-2.0')
 
@@ -17,6 +17,7 @@ benchmark_sources = [
  'src/counter.cc',
  'src/csv_reporter.cc',
  'src/json_reporter.cc',
+ 'src/perf_counters.cc',
  'src/reporter.cc',
  'src/sleep.cc',
  'src/statistics.cc',
@@ -28,19 +29,25 @@ benchmark_sources = [
 benchmark_main_sources = ['src/benchmark_main.cc']
 inc = include_directories('include')
 
-thread_dep = dependency('threads')
 
-lib_benchmark = library('gbenchmark',
+lib_benchmark_deps = [ dependency('threads') ]
+
+if host_machine.system() == 'windows'
+  cc = meson.get_compiler('cpp')
+  lib_benchmark_deps += cc.find_library('shlwapi', required : true)
+endif
+
+lib_benchmark = static_library('gbenchmark',
                         benchmark_sources,
                         include_directories:inc,
                         cpp_args : '-DNDEBUG',
-                        dependencies : thread_dep)
+                        dependencies : lib_benchmark_deps)
 
 google_benchmark_dep = declare_dependency(
                         link_with:lib_benchmark,
                         include_directories:inc)
 
-lib_benchmark_main = library('benchmark-main',
+lib_benchmark_main = static_library('benchmark-main',
                         benchmark_main_sources,
                         include_directories:inc,
                         cpp_args : '-DNDEBUG',

@@ -1,19 +1,19 @@
-project('pcre2', 'c', version: '10.23', license: 'BSD-3')
+project('pcre2', 'c', version: '10.39', license: 'BSD-3')
 
 c_compiler = meson.get_compiler('c')
 
 pcre2_h = configure_file(input : 'src/pcre2.h.generic',
   output : 'pcre2.h',
-  configuration : configuration_data())
+  copy: true)
 
 chartables = configure_file(input : 'src/pcre2_chartables.c.dist',
   output : 'pcre2_chartables.c',
-  configuration : configuration_data())
+  copy: true)
 
 
 config_h = configure_file(input : 'src/config.h.generic',
   output : 'config.h',
-  configuration : configuration_data())
+  copy: true)
 
 sources = [
   'src/pcre2_auto_possess.c',
@@ -22,8 +22,10 @@ sources = [
   'src/pcre2_compile.c',
   'src/pcre2_config.c',
   'src/pcre2_context.c',
+  'src/pcre2_convert.c',
   'src/pcre2_dfa_match.c',
   'src/pcre2_error.c',
+  'src/pcre2_extuni.c',
   'src/pcre2_find_bracket.c',
   'src/pcre2_jit_compile.c',
   'src/pcre2_maketables.c',
@@ -32,6 +34,7 @@ sources = [
   'src/pcre2_newline.c',
   'src/pcre2_ord2utf.c',
   'src/pcre2_pattern_info.c',
+  'src/pcre2_script_run.c',
   'src/pcre2_serialize.c',
   'src/pcre2_string_utils.c',
   'src/pcre2_study.c',
@@ -46,26 +49,26 @@ sources = [
 includes = [include_directories('.'), include_directories('src')]
 
 check_headers = [
-  ['HAVE_INTTYPES_H', 'inttypes.h'],
-  ['HAVE_BZLIB_H', 'bzlib.h'],
-  ['HAVE_SYS_STAT_H', 'sys/stat.h'],
-  ['HAVE_SYS_TYPES_H', 'sys/types.h'],
-  ['HAVE_SYS_WAIT_H', 'sys/wait.h'],
-  ['HAVE_INTTYPES_H', 'inttypes.h'],
-  ['HAVE_DIRENT_H', 'dirent.h'],
-  ['HAVE_DLFCN_H', 'dlfcn.h'],
-  ['HAVE_LIMITS_H', 'limits.h'],
-  ['HAVE_STDINT_H', 'stdint.h'],
-  ['HAVE_STDLIB_H', 'stdlib.h'],
-  ['HAVE_STRING_H', 'string.h'],
-  ['HAVE_WINDOWS_H', 'windows.h'],
-  ['HAVE_UNISTD_H', 'unistd.h']
+  'inttypes.h',
+  'bzlib.h',
+  'sys/stat.h',
+  'sys/types.h',
+  'sys/wait.h',
+  'inttypes.h',
+  'dirent.h',
+  'dlfcn.h',
+  'limits.h',
+  'stdint.h',
+  'stdlib.h',
+  'string.h',
+  'windows.h',
+  'unistd.h'
 ]
 
 config_h_defs = []
 foreach h : check_headers
-  if c_compiler.has_header(h.get(1))
-    config_h_defs += ['-D' + h.get(0)]
+  if c_compiler.has_header(h)
+    config_h_defs += ['-DHAVE_' + h.underscorify().to_upper()]
   endif
 endforeach
 
@@ -144,10 +147,16 @@ pkg.generate(libraries : pcre2_32_lib,
 #### tests
 
 if not meson.is_cross_build() # wine wrappers are not bat-friendly, this would need better testing
+  link_args = []
+  if host_machine.system() == 'windows'
+    link_args += '/STACK:2500000'
+  endif
+
   pcre2test = executable('pcre2test', ['src/pcre2test.c'],
     include_directories: includes,
     link_with: [pcre2_8_lib, pcre2_posix_lib, pcre2_16_lib, pcre2_32_lib],
-    c_args: config_h_defs + ['-DHAVE_CONFIG_H'])
+    c_args: config_h_defs + ['-DHAVE_CONFIG_H'],
+    link_args: link_args)
 
   if host_machine.system() == 'windows'
     runtest = find_program('RunTest.bat')

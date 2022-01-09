@@ -1,5 +1,5 @@
 project('fluidsynth', 'c', 'cpp',
-        version : '2.2.0',
+        version : '2.2.4',
         license : 'LGPL-2.1-or-later',
         default_options : ['b_ndebug=if-release'],
         meson_version : '>= 0.53.0')
@@ -9,6 +9,26 @@ cc = meson.get_compiler('c')
 summary('Build type',     get_option('buildtype'), section : 'Build Summary')
 summary('Install prefix', get_option('prefix'),    section : 'Build Summary')
 
+# Due to symbol visibility issues, don't allow building 'both' library
+# types on MSVC
+if get_option('default_library') == 'both' and cc.get_id() == 'msvc'
+  error('default_library=both not supported when compiling with MSVC')
+endif
+
+# Is a shared library being built?
+is_shared_lib = get_option('default_library') == 'shared'
+
+# Set global WIN32 define if windows
+if host_machine.system() == 'windows'
+  add_project_arguments('-DWIN32=1', language : ['c', 'cpp'])
+endif
+
+# Detect if compiling in an MSYS2-based MinGW/Clang environment
+host_is_msys2 = false
+if host_machine.system() == 'windows'
+  shell_cmd = find_program('sh', required : false, disabler: true)
+  host_is_msys2 = run_command(shell_cmd, '-c', '[ ! -z "$MSYSTEM" ] && [ "$MSYSTEM" != "MSYS" ] && exit 0; exit 1', check: false).returncode() == 0
+endif
 
 # config file
 #
@@ -22,14 +42,13 @@ conf.set('DEFAULT_SOUNDFONT', get_option('datadir') / 'soundfonts' / 'default.sf
 conf.set('TEST_SOUNDFONT', meson.current_source_dir() / 'sf2' / 'VintageDreamsWaves-v2.sf2')
 conf.set('TEST_SOUNDFONT_SF3', meson.current_source_dir() / 'sf2' / 'VintageDreamsWaves-v2.sf3')
 conf.set('STDC_HEADERS', 1)
-conf.set('SUPPORTS_VLA', 1) # some check for ancient compilers
 
 if host_machine.system() == 'darwin'
   conf.set('DARWIN', 1)
 endif
 
 if host_machine.endian() == 'big'
-  conf_data.set('WORDS_BIGENDIAN', 1)
+  conf.set('WORDS_BIGENDIAN', 1)
 endif
 
 if get_option('enable-floats')
@@ -52,7 +71,9 @@ headers_to_check = [
 ]
 
 foreach h : headers_to_check 
-  conf.set10('HAVE_' + h.underscorify().to_upper(), cc.has_header(h))
+  if cc.has_header(h)
+    conf.set10('HAVE_' + h.underscorify().to_upper(), true)
+  endif
 endforeach
 
 if cc.has_function('inet_ntop', prefix : '#include <arpa/inet.h>')
@@ -60,17 +81,40 @@ if cc.has_function('inet_ntop', prefix : '#include <arpa/inet.h>')
 endif
 
 foreach fun : ['sinf', 'cosf', 'fabsf', 'powf', 'sqrtf', 'logf']
-  conf.set10('HAVE_' + fun.to_upper(), cc.has_function(fun))
+  if cc.has_function(fun)
+    conf.set10('HAVE_' + fun.to_upper(), true)
+  endif
 endforeach
 
+# Some compilers such as msvc may not support VLA, the following test
+# is adapted from upstream CMake
+vla_code = 'int main(int argc, char *argv[]){int arr[argc]; return 0;}'
+if cc.compiles(vla_code, name: 'VLA check')
+  conf.set('SUPPORTS_VLA', 1)
+endif
 
 # external dependencies
 
 m_dep       = cc.find_library('m', required : false)
 glib_dep    = dependency('glib-2.0', static : get_option('try-static-deps'))
 gthread_dep = dependency('gthread-2.0', static : get_option('try-static-deps'))
-openmp_dep  = dependency('openmp', required : false, language : 'c',
+openmp_dep  = dependency('openmp', required : get_option('openmp'), language : 'c',
                          version : '>= 4.0')
+
+ext_deps = [m_dep, glib_dep, gthread_dep, openmp_dep]
+
+# Windows specific options
+lib_args = []
+if host_machine.system() == 'windows'
+  if is_shared_lib
+    lib_args = ['-DFLUIDSYNTH_DLL_EXPORTS']
+  endif
+  # Specific workaround on MSYS2 to obtain static dependencies of intl, such as iconv
+  # This is required as of meson 0.59
+  if get_option('try-static-deps') and host_is_msys2
+    ext_deps += [dependency('intl' , static : true)]
+  endif
+endif
 
 if openmp_dep.found()
   conf.set('HAVE_OPENMP', 1)
@@ -102,8 +146,12 @@ lib_includes = [include_directories('.', 'include'), src_includes]
 dep_includes = include_directories('include')
 
 fluidsynth_lib = library('fluidsynth', fluidsynth_sources, gen_tables,
-                         dependencies : [m_dep, glib_dep, gthread_dep, openmp_dep],
-                         include_directories : lib_includes)
+                         dependencies : ext_deps,
+                         include_directories : lib_includes,
+                         c_args: lib_args,
+                         cpp_args: lib_args)
+
+fluidsynth_obj = fluidsynth_lib.extract_objects(fluidsynth_sources)
 
 fluidsynth_dep = declare_dependency(link_with : fluidsynth_lib,
                                     include_directories : dep_includes)

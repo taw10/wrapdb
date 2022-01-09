@@ -67,9 +67,7 @@ check_headers = [
   ['OPJ_HAVE_STDINT_H', 'stdint.h'],
 ]
 foreach h : check_headers
-  if cc.has_header(h.get(1))
-    opj_config.set(h.get(0), 1)
-  endif
+  opj_config.set(h.get(0), cc.has_header(h.get(1)))
 endforeach
 
 opj_private_config = configuration_data()
@@ -96,22 +94,17 @@ check_headers = [
 ]
 
 foreach h : check_headers
-  if cc.has_header(h.get(1))
-    opj_private_config.set(h.get(0), 1)
-  endif
+  opj_private_config.set(h.get(0), cc.has_header(h.get(1)))
 endforeach
 
-if cc.has_function('_aligned_malloc', prefix : '#include <malloc.h>')
-  opj_private_config.set('OPJ_HAVE__ALIGNED_MALLOC', 1)
-endif
+opj_private_config.set('OPJ_HAVE__ALIGNED_MALLOC',
+  cc.has_function('_aligned_malloc', prefix : '#include <malloc.h>'))
 
-if cc.has_function('memalign', prefix : '#include <malloc.h>')
-  opj_private_config.set('OPJ_HAVE_MEMALIGN', 1)
-endif
+opj_private_config.set('OPJ_HAVE_MEMALIGN',
+  cc.has_function('memalign', prefix : '#include <malloc.h>'))
 
-if cc.has_function('posix_memalign', prefix : '#include <stdlib.h>')
-  opj_private_config.set('OPJ_HAVE_POSIX_MEMALIGN', 1)
-endif
+opj_private_config.set('OPJ_HAVE_POSIX_MEMALIGN',
+  cc.has_function('posix_memalign', prefix : '#include <stdlib.h>'))
 
 opj_private_config.set('PACKAGE_VERSION', openjpeg_package_version)
 
@@ -166,15 +159,18 @@ endif
 #################################################################################
 cmake_thread_prefer_pthread = 'TRUE'
 if not get_option('opj_use_thread')
+  message('Use stub thread implementation')
   openjp2_c_args += ('-DMUTEX_stub')
 endif
 
-if get_option('opj_use_thread') and host_system == 'windows' and not thread_dep.found()
+if get_option('opj_use_thread') and host_system == 'windows'
   # add_definitions('-DMUTEX_win32')
+  message('Use win32 thread implementation')
   openjp2_c_args += ('-DMUTEX_win32')
 endif
 
 if get_option('opj_use_thread') and thread_dep.found()
+  message('Use pthread implementation')
   openjp2_c_args += ('-DMUTEX_pthread')
 endif
 

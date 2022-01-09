@@ -1,22 +1,55 @@
 {
+  "_comment": ["skip_linux and skip_windows are lists of wraps that are known",
+               "to fail on the CI and should get repaired whenever possible.",
+               "Please remove projects from those lists once they are updated."],
   "skip_linux": [
-    "arduinocore-avr", "cpr", "glew", "glib", "hinnant-date", "imgui-sfml",
-    "jsoncpp", "libtomcrypt", "libxmlpp", "openal-soft", "openh264", "pcre2",
-    "protobuf-c", "pugixml", "quazip", "sdl2", "sdl2_image", "sdl2_mixer",
+    "arduinocore-avr", "cpr", "glew", "hinnant-date", "imgui-sfml",
+    "libtomcrypt", "libxmlpp", "openal-soft", "openh264",
+    "protobuf-c", "pugixml", "quazip", "sdl2_image", "sdl2_mixer",
     "sdl2_net", "sdl2_ttf", "zstd"
   ],
-  "skip_windows":[
+  "skip_windows": [
     "arduinocore-avr", "box2d", "cjson", "cpr", "docopt",
-    "emilk-loguru", "enet", "facil", "flatbuffers", "fluidsynth", "freetype2",
-    "fuse", "gdbm", "glib", "google-benchmark", "google-snappy", "google-woff2",
-    "hinnant-date", "htslib", "icu", "imgui-sfml", "inih", "jbigkit", "json-c",
-    "jsoncpp", "libexif", "libgpiod", "libjpeg-turbo", "liblbfgs", "liblzma",
-    "libopenjp2", "libpng", "libtomcrypt", "liburing", "libuv", "libwebsockets",
-    "libxml2", "libxmlpp", "lua", "lzo2", "mocklibc", "mpdecimal", "netstring-c",
-    "nng", "openh264", "openssl", "pcre2", "protobuf", "protobuf-c", "pugixml",
-    "quazip", "rdkafka", "reflex", "sdl2", "sdl2_image", "sdl2_mixer",
+    "emilk-loguru", "enet", "facil", "flatbuffers",
+    "fuse", "gdbm", "google-snappy", "google-woff2",
+    "hinnant-date", "imgui-sfml", "inih", "jbigkit",
+    "libexif", "libgpiod", "liblbfgs", "liblzma",
+    "libtomcrypt", "libuv", "libwebsockets",
+    "libxmlpp", "lzo2", "mocklibc", "mpdecimal", "netstring-c",
+    "nng", "openh264", "openssl", "protobuf", "protobuf-c", "pugixml",
+    "quazip", "rdkafka", "reflex", "sdl2_image", "sdl2_mixer",
     "sdl2_net", "sdl2_ttf", "termbox", "unit-system", "xxhash", "zstd"
   ],
+
+  "fluidsynth": {
+    "build_options": [
+      "glib:tests=false"
+    ]
+  },
+  "glib": {
+    "_comment": ["- Disable unit tests because upstream does not run them on Windows and some are flaky on Linux."],
+    "build_options": [
+      "glib:tests=false"
+    ]
+  },
+  "htslib": {
+    "_comment": ["- relies on lots of POSIX interfaces"],
+    "linux_only": true,
+    "build_options": [
+      "htslib:tests=true"
+    ]
+  },
+  "imgui": {
+    "debian_packages": [
+      "liballegro5-dev",
+      "libglfw3-dev",
+      "libsdl2-dev",
+      "libvulkan-dev"
+    ]
+  },
+  "liburing": {
+    "linux_only": true
+  },
   "libxmlpp": {
     "debian_packages": [
       "libglibmm-2.4-dev"
@@ -28,6 +61,31 @@
       "rdkafka:WITH_ZSTD=disabled"
     ]
   },
+  "rtaudio": {
+    "debian_packages": [
+      "libpulse-dev",
+      "libasound2-dev",
+      "libjack-dev"
+    ]
+  },
+  "sdl2": {
+    "debian_packages": [
+      "libwayland-dev",
+      "libx11-dev",
+      "libxcursor-dev",
+      "libxext-dev",
+      "libxi-dev",
+      "libxinerama-dev",
+      "libxkbcommon-dev",
+      "libxkbfile-dev",
+      "libxrandr-dev",
+      "libxt-dev",
+      "libxv-dev",
+      "libxxf86vm-dev",
+      "pkg-config",
+      "wayland-protocols"
+    ]
+  },
   "sfml": {
     "debian_packages": [
       "libgl-dev",
@@ -36,9 +94,24 @@
       "libxrandr-dev"
     ]
   },
-  "spng": {
+  "slirp": {
+    "_comment": ["- Limited to linux_only pending the addition of other POSIX-ish environments to the test matrix."],
+    "linux_only": true,
     "build_options": [
-      "force_fallback_for=zlib"
+      "glib:tests=false"
+    ]
+  },
+  "wayland": {
+    "linux_only": true,
+    "build_options": [
+      "wayland:documentation=false"
+    ]
+  },
+  "wayland-protocols": {
+    "linux_only": true,
+    "debian_packages": [
+      "libwayland-bin",
+      "libwayland-dev"
     ]
   }
 }
