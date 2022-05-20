@@ -29,6 +29,12 @@ from utils import Version, is_ci, is_debianlike, is_linux, is_macos
 
 PERMITTED_FILES = ['generator.sh', 'meson.build', 'meson_options.txt', 'LICENSE.build']
 PER_PROJECT_PERMITTED_FILES = {
+    'lame': [
+        'lame.h',
+    ],
+    'mpdecimal': [
+        'gettests.py',
+    ],
     'openssl': [
         'bn_conf.h',
         'dso_conf.h',
@@ -36,9 +42,6 @@ PER_PROJECT_PERMITTED_FILES = {
         'generate_gypi.pl.patch',
         'meson.build.tmpl',
         'README.md',
-    ],
-    'lame': [
-        'lame.h',
     ],
     'sdl2': [
         'find-dylib-name.py'
@@ -57,10 +60,10 @@ class TestReleases(unittest.TestCase):
 
         try:
             fn = 'releases.json'
-            with open(fn, 'r') as f:
+            with open(fn, 'r', encoding='utf-8') as f:
                 cls.releases = json.load(f)
             fn = 'ci_config.json'
-            with open(fn, 'r') as f:
+            with open(fn, 'r', encoding='utf-8') as f:
                 cls.ci_config = json.load(f)
         except json.decoder.JSONDecodeError:
             raise RuntimeError(f'file {fn} is malformed')
@@ -113,7 +116,7 @@ class TestReleases(unittest.TestCase):
 
                 # Make sure we can load wrap file
                 config = configparser.ConfigParser(interpolation=None)
-                config.read(f'subprojects/{name}.wrap')
+                config.read(f'subprojects/{name}.wrap', encoding='utf-8')
 
                 # Basic checks
                 with self.subTest(step='basic'):
@@ -262,7 +265,7 @@ class TestReleases(unittest.TestCase):
             print(log_file.read_text(encoding='utf-8'))
             print('::endgroup::')
             raise
-        subprocess.check_call(['meson', 'compile', '-C', builddir])
+        subprocess.check_call(['meson', 'compile', '-C', builddir, '-v'])
         try:
             subprocess.check_call(['meson', 'test', '-C', builddir, '--suite', name, '--print-errorlogs'])
         except subprocess.CalledProcessError:
@@ -289,7 +292,7 @@ class TestReleases(unittest.TestCase):
                 continue
             elif not self.is_permitted_file(subproject, f.name):
                 not_permitted.append(f)
-            elif f.name in NO_TABS_FILES and '\t' in f.read_text():
+            elif f.name in NO_TABS_FILES and '\t' in f.read_text(encoding='utf-8'):
                 tabs.append(f)
         if tabs:
             tabs_str = ', '.join([str(f) for f in tabs])
