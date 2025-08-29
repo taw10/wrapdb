@@ -596,6 +596,12 @@
       "libattr1-dev"
     ]
   },
+  "libccp4c": {
+    "_comment": "- upstream does not support building on Windows",
+    "build_on": {
+      "msys2": false
+    }
+  },
   "libdrm": {
     "_comment": "- relies on Linux and BSD specific APIs",
     "build_on": {

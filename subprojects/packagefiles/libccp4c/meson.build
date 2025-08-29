@@ -9,6 +9,25 @@ project(
 )
 
 cc = meson.get_compiler('c')
+
+if host_machine.system() == 'cygwin'
+  error('libccp4c cannot be compiled on Cygwin/MSYS2')
+endif
+
+if cc.get_id() == 'msvc'
+  if host_machine.endian() == 'little'
+    add_project_arguments(
+      '-D__BYTE_ORDER=__LITTLE_ENDIAN',
+      language: 'c',
+    )
+  elif host_machine.endian() == 'big'
+    add_project_arguments(
+      '-D__BYTE_ORDER=__BIG_ENDIAN',
+      language: 'c',
+    )
+  endif
+endif
+
 mdep = cc.find_library(
   'm',
   required: false,
