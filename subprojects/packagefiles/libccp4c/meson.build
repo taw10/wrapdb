@@ -10,6 +10,8 @@ project(
 
 cc = meson.get_compiler('c')
 
+message('host_machine.system = ' + host_machine.system())
+message('build_machine.system = ' + build_machine.system())
 if host_machine.system() == 'cygwin'
   error('libccp4c cannot be compiled on Cygwin/MSYS2')
 endif
