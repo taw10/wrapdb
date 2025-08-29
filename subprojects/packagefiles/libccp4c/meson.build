@@ -3,8 +3,9 @@ project(
   'libccp4c',
   'c',
   version: '8.0.0',
-  meson_version: '>=0.49.0',
+  meson_version: '>=0.63.0',
   license: 'LGPL-3.0-or-later',
+  default_options: ['c_std=gnu89,c89'],
 )
 
 cc = meson.get_compiler('c')
