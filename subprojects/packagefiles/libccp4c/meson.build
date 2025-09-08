@@ -13,8 +13,25 @@ mdep = cc.find_library(
   required: false,
 )
 
-if host_machine.system() == 'windows'
-  error('Building libccp4c is unsupported on Windows')
+if cc.get_id() == 'msvc'
+  if host_machine.endian() == 'little'
+    add_project_arguments(
+      '-D__BYTE_ORDER=__LITTLE_ENDIAN',
+      language: 'c',
+    )
+  elif host_machine.endian() == 'big'
+    add_project_arguments(
+      '-D__BYTE_ORDER=__BIG_ENDIAN',
+      language: 'c',
+    )
+  endif
+endif
+
+if host_machine.system() == 'windows' and cc.get_id() != 'msvc'
+  add_project_arguments(
+    '-includestdint.h',
+    language: 'c',
+  )
 endif
 
 # Note that the source code assumes that datadir='share'.
