@@ -82,7 +82,9 @@ libccp4c = library(
   'ccp4/cmtzlib.c',
   'ccp4/library_utils.c',
   dependencies: mdep,
-  override_options: ['c_std=gnu89,c89'],
+  override_options: [
+    meson.version().version_compare('>=1.3.0') ? 'c_std=gnu89,c89' : 'c_std=gnu89',
+  ],
   install: true,
 )
 
