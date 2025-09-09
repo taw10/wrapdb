@@ -29,6 +29,13 @@ if host_machine.system() == 'windows' and cc.get_id() == 'gcc'
   cargs += ['-includestdint.h']
 endif
 
+message('Compiler = '+cc.get_id())
+message('Compiler argument style = '+cc.get_argument_syntax())
+message('Host system = '+host_machine.system())
+message('C standard = '+cstd)
+message('C compiler arguments = ')
+message(cargs)
+
 # Note that the source code assumes that datadir='share'.
 # If it is not, programs using the library will not be able
 # to find 'environ.def'.
