@@ -15,23 +15,16 @@ mdep = cc.find_library(
 
 if cc.get_id() == 'msvc'
   if host_machine.endian() == 'little'
-    add_project_arguments(
-      '-D__BYTE_ORDER=__LITTLE_ENDIAN',
-      language: 'c',
-    )
+    cargs = ['-D__BYTE_ORDER=__LITTLE_ENDIAN']
   elif host_machine.endian() == 'big'
-    add_project_arguments(
-      '-D__BYTE_ORDER=__BIG_ENDIAN',
-      language: 'c',
-    )
+    cargs = ['-D__BYTE_ORDER=__BIG_ENDIAN']
   endif
+else
+  cargs = []
 endif
 
 if host_machine.system() == 'windows' and cc.get_id() != 'msvc'
-  add_project_arguments(
-    '-includestdint.h',
-    language: 'c',
-  )
+  cargs += ['-includestdint.h']
 endif
 
 # Note that the source code assumes that datadir='share'.
@@ -85,6 +78,7 @@ libccp4c = library(
   override_options: [
     meson.version().version_compare('>=1.3.0') ? 'c_std=gnu89,c89' : 'c_std=gnu89',
   ],
+  c_args: cargs,
   install: true,
 )
 
