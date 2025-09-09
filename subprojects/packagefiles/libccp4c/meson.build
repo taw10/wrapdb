@@ -25,7 +25,7 @@ else
   cstd = 'gnu89'
 endif
 
-if host_machine.system() == 'windows' and cc.get_id() != 'msvc'
+if host_machine.system() == 'windows' and cc.get_id() == 'gcc'
   cargs += ['-includestdint.h']
 endif
 
